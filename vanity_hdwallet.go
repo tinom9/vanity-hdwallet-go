@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"strings"
 
@@ -69,8 +70,10 @@ func checkVanity(address, prefix, vanity string) bool {
 
 func generateVanityAddress(currency, vanity string, words int, passphrase string) (string, error) {
 	for count := 1; ; count++ {
-		fmt.Printf("Try: %d\n", count)
-		m, _ := generateMnemonic(12)
+		m, err := generateMnemonic(words)
+		if err != nil {
+			return "", err
+		}
 		var address string
 		if currency == CosmosCurrency {
 			address, _ = getCosmosAddress(m, passphrase)
@@ -79,6 +82,7 @@ func generateVanityAddress(currency, vanity string, words int, passphrase string
 		} else {
 			return "", ErrInvalidCurrency
 		}
+		fmt.Printf("Try: %d\n", count)
 		if checkVanity(address, currencyPrefixMap[currency], vanity) {
 			fmt.Printf("Address found: %s\nMnemonic: %s\n", address, m)
 			return address, nil
@@ -87,5 +91,13 @@ func generateVanityAddress(currency, vanity string, words int, passphrase string
 }
 
 func main() {
-	_, _ = generateVanityAddress(BitcoinCurrency, "", 24, "")
+	currency := flag.String("currency", BitcoinCurrency, "currency to use")
+	vanity := flag.String("vanity", "", "vanity string to use")
+	words := flag.Int("words", 12, "number of words to use")
+	passphrase := flag.String("passphrase", "", "passphrase to use")
+	flag.Parse()
+	_, err := generateVanityAddress(*currency, *vanity, *words, *passphrase)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
 }
