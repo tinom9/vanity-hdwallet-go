@@ -1,4 +1,4 @@
-package main
+package derivations
 
 import (
 	"crypto/hmac"
@@ -18,7 +18,7 @@ const (
 	HardenedIndex = 0x80000000
 )
 
-func mnemonicToSeed(mnemonic, passphrase string) []byte {
+func mnemonicToSeed(mnemonic string, passphrase string) []byte {
 	passphrase = "mnemonic" + passphrase
 	mnemonicBytes := []byte(mnemonic)
 	passphraseBytes := []byte(passphrase)
@@ -76,7 +76,7 @@ func derivePrivateChild(pubKey, privKey, chainCode []byte, index uint32, hardene
 	return childKey.Serialize(), payload[32:]
 }
 
-func derivePublicKey(mnemonic, passphrase, path string) []byte {
+func DerivePublicKey(mnemonic, passphrase, path string) []byte {
 	seed := mnemonicToSeed(mnemonic, passphrase)
 	privKey, chainCode := derivePrivateKeyFromSeed(seed)
 	pubKey := privKeyToPubKey(privKey)

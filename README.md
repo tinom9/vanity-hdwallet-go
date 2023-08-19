@@ -5,5 +5,5 @@ Create wallets that derive vanity addresses for Bitcoin and Cosmos blockchains.
 ## Usage
 
 ```bash
-go run *.go -currency bitcoin -vanity abc -words 24 -passphrase pwd
+go run main.go -currency bitcoin -vanity 0000 -words 24 -passphrase pwd
 ```

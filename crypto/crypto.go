@@ -1,4 +1,4 @@
-package main
+package crypto
 
 import (
 	"crypto/sha256"
@@ -7,13 +7,13 @@ import (
 	"golang.org/x/crypto/ripemd160"
 )
 
-func sha3(data []byte) []byte {
+func Sha3(data []byte) []byte {
 	hash := sha256.New()
 	hash.Write(data)
 	return hash.Sum(nil)
 }
 
-func ripemd160Hash(data []byte) []byte {
+func Ripemd160Hash(data []byte) []byte {
 	hash := ripemd160.New()
 	hash.Write(data)
 	return hash.Sum(nil)

@@ -1,4 +1,4 @@
-module vanity-hdwallet-go
+module vanityhdwallet
 
 go 1.19
 
