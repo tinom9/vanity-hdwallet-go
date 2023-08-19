@@ -4,7 +4,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"runtime"
 	"strings"
+	"sync"
 	"vanityhdwallet/addresses"
 	currencies "vanityhdwallet/currency"
 
@@ -24,39 +26,78 @@ func generateMnemonic(words int) (string, error) {
 	return bip39.NewMnemonic(entropy)
 }
 
-func checkVanity(address, prefix, vanity string) bool {
-	return strings.HasPrefix(address, prefix+vanity)
+func checkVanity(address string, currency string, vanity string) bool {
+	return strings.HasPrefix(address, currencies.PrefixMap[currency]+vanity)
 }
 
-func generateVanityAddress(currency, vanity string, words int, passphrase string) (string, error) {
-	for count := 1; ; count++ {
-		m, err := generateMnemonic(words)
-		if err != nil {
-			return "", err
-		}
-		var address string
-		if currency == currencies.Cosmos {
-			address, _ = addresses.GetCosmosAddress(m, passphrase)
-		} else if currency == currencies.Bitcoin {
-			address, _ = addresses.GetBitcoinAddress(m, passphrase)
-		} else {
-			return "", ErrInvalidCurrency
-		}
-		fmt.Printf("Try: %d\n", count)
-		if checkVanity(address, currencies.PrefixMap[currency], vanity) {
-			fmt.Printf("Address found: %s\nMnemonic: %s\n", address, m)
-			return address, nil
-		}
+func generateAddress(currency string, words int, passphrase string) (string, string, error) {
+	mnemonic, err := generateMnemonic(words)
+	if err != nil {
+		return "", "", err
+	}
+	var address string
+	if currency == currencies.Cosmos {
+		address, _ = addresses.GetCosmosAddress(mnemonic, passphrase)
+	} else if currency == currencies.Bitcoin {
+		address, _ = addresses.GetBitcoinAddress(mnemonic, passphrase)
+	} else {
+		return "", "", ErrInvalidCurrency
+	}
+	return address, mnemonic, nil
+}
+
+func generateVanityAddress(currency string, vanity string, words int, passphrase string, numWorkers int) (string, error) {
+	resultChan := make(chan string, numWorkers)
+	errorChan := make(chan error, numWorkers)
+	doneChan := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-doneChan:
+					return
+				default:
+					address, mnemonic, err := generateAddress(currency, words, passphrase)
+					if err != nil {
+						errorChan <- err
+						return
+					}
+					if checkVanity(address, currency, vanity) {
+						fmt.Printf("Address found: %s\nMnemonic: %s\n", address, mnemonic)
+						resultChan <- address
+						close(doneChan)
+						return
+					}
+				}
+			}
+		}()
+	}
+	select {
+	case result := <-resultChan:
+		wg.Wait()
+		return result, nil
+	case err := <-errorChan:
+		close(doneChan)
+		return "", err
 	}
 }
 
-func main() {
+func getCLIArgs() (*string, *string, *int, *string, *int) {
 	currency := flag.String("currency", currencies.Bitcoin, "currency to use")
 	vanity := flag.String("vanity", "", "vanity string to use")
 	words := flag.Int("words", 12, "number of words to use")
 	passphrase := flag.String("passphrase", "", "passphrase to use")
+	numWorkers := flag.Int("num-workers", runtime.NumCPU(), "number of workers to use")
 	flag.Parse()
-	_, err := generateVanityAddress(*currency, *vanity, *words, *passphrase)
+	return currency, vanity, words, passphrase, numWorkers
+}
+
+func main() {
+	currency, vanity, words, passphrase, numWorkers := getCLIArgs()
+	_, err := generateVanityAddress(*currency, *vanity, *words, *passphrase, *numWorkers)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 	}
